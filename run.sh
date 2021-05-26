@@ -1,0 +1,1 @@
+npm run build && sudo npm install -g && release -t token -n release -b branch
