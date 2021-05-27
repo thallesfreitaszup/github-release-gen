@@ -15,6 +15,7 @@ import {getRepoConfig} from "./release/config/config"; // (normal include)
      .requiredOption('-t, --token <token>', 'Token')
      .requiredOption('-n, --name <name>', 'Release name')
      .requiredOption('-b, --branch <branch>', 'Release base')
+     .option('-c','--changelog', 'Create changelog ')
  command.parse();
 
  const options = command.opts();

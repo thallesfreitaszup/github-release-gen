@@ -10,10 +10,10 @@ export class  Release {
         this.options = {
             token: options.token,
             releaseName: options.name,
+            branch: options.branch
         }
     }
     async loadGitConfig(gitConfig) {
-        console.log(gitConfig)
         if(!gitConfig.length){
             throw Error('could not load repo config')
         }
@@ -28,22 +28,35 @@ export class  Release {
 
     async create(config: any) {
         const releases = await this.getLatestRelease()
-        const mergedPullRequests = await this.getMergedPullRequests()
-        console.log(mergedPullRequests)
-        // createRelease()
-        //TODO
+        const mergedPullRequests = await this.getMergedPullRequests(releases.published_at)
+         await this.createRelease(mergedPullRequests)
     }
 
-    private async getMergedPullRequests() {
+    private async getMergedPullRequests(lastReleaseDate) {
         const url = makeGitUrlRequest(this.releaseConfig.repo,this.releaseConfig.owner, 'pulls')
         const urlWithParams  = appendParamUrl(url, 'state', 'closed')
-        return await get(urlWithParams)
+        const closedPrs = await get(urlWithParams)
+        const mergedPrsFromBranch =  closedPrs.filter(
+            pr => this.canBeOnRelease(pr,lastReleaseDate)
+        )
+        return mergedPrsFromBranch.map(
+            it => {
+                return {
+                    title: it.title,
+                    body: it.body
+                }
+            }
+        )
+    }
+
+    private canBeOnRelease(pr, lastReleaseDate) {
+        return pr.merged_at != null && pr.base.ref === this.releaseConfig.branch && pr.merged_at > lastReleaseDate
     }
 
     private async getLatestRelease() {
         const url = makeGitUrlRequest(this.releaseConfig.repo,this.releaseConfig.owner, 'releases')
         const releases = await get(url)
-        return releases
+        return releases[0]
     }
 
     private configToObject(repoConfig: String[]) {
@@ -56,5 +69,19 @@ export class  Release {
             repo
         }
         return object
+    }
+
+    private async createRelease(mergedPullRequests: any) {
+        const url = makeGitUrlRequest(this.releaseConfig.repo,this.releaseConfig.owner, 'releases')
+        const releaseBody = {
+            body: JSON.stringify(mergedPullRequests),
+            name: this.releaseConfig.releaseName,
+            tag_name: this.releaseConfig.releaseName
+        }
+        const headers = {
+            'Authorization': `token ${this.releaseConfig.token}`
+        }
+        const response = await post(url, releaseBody, headers)
+        console.log(response)
     }
 }
