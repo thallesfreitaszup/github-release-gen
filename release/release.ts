@@ -2,6 +2,7 @@
 import {AppConstants} from "./config/constants";
 import {get, post} from "./utils/http";
 import {appendParamUrl, makeGitUrlRequest} from "./utils/url";
+import {formatRelease} from "./utils/format";
 
 export class  Release {
     private options
@@ -27,9 +28,9 @@ export class  Release {
     }
 
     async create(config: any) {
-        const releases = await this.getLatestRelease()
-        const mergedPullRequests = await this.getMergedPullRequests(releases.published_at)
-         await this.createRelease(mergedPullRequests)
+        const release = await this.getLatestRelease()
+        const mergedPullRequests = await this.getMergedPullRequests(release?.published_at)
+        await this.createRelease(mergedPullRequests)
     }
 
     private async getMergedPullRequests(lastReleaseDate) {
@@ -43,7 +44,9 @@ export class  Release {
             it => {
                 return {
                     title: it.title,
-                    body: it.body
+                    body: it.body,
+                    url: it.html_url,
+                    number: it.number
                 }
             }
         )
@@ -56,7 +59,7 @@ export class  Release {
     private async getLatestRelease() {
         const url = makeGitUrlRequest(this.releaseConfig.repo,this.releaseConfig.owner, 'releases')
         const releases = await get(url)
-        return releases[0]
+        return releases.length ? releases[0] : null
     }
 
     private configToObject(repoConfig: String[]) {
@@ -74,7 +77,7 @@ export class  Release {
     private async createRelease(mergedPullRequests: any) {
         const url = makeGitUrlRequest(this.releaseConfig.repo,this.releaseConfig.owner, 'releases')
         const releaseBody = {
-            body: JSON.stringify(mergedPullRequests),
+            body: formatRelease(mergedPullRequests),
             name: this.releaseConfig.releaseName,
             tag_name: this.releaseConfig.releaseName
         }
@@ -82,6 +85,5 @@ export class  Release {
             'Authorization': `token ${this.releaseConfig.token}`
         }
         const response = await post(url, releaseBody, headers)
-        console.log(response)
     }
 }
